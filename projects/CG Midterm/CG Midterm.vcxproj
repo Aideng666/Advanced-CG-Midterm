@@ -109,6 +109,24 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="src\BackendHandler.h" />
+    <ClInclude Include="src\ColorCorrectEffect.h" />
+    <ClInclude Include="src\Framebuffer.h" />
+    <ClInclude Include="src\GreyscaleEffect.h" />
+    <ClInclude Include="src\LUT.h" />
+    <ClInclude Include="src\PostEffect.h" />
+    <ClInclude Include="src\SepiaEffect.h" />
+    <ClInclude Include="src\Util.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\BackendHandler.cpp" />
+    <ClCompile Include="src\ColorCorrectEffect.cpp" />
+    <ClCompile Include="src\Framebuffer.cpp" />
+    <ClCompile Include="src\GreyscaleEffect.cpp" />
+    <ClCompile Include="src\LUT.cpp" />
+    <ClCompile Include="src\PostEffect.cpp" />
+    <ClCompile Include="src\SepiaEffect.cpp" />
+    <ClCompile Include="src\Util.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
