@@ -4,7 +4,6 @@ void PostEffect::Init(unsigned width, unsigned height)
 {
 	if (!_shaders.size() > 0)
 	{
-
 		int index = int(_buffers.size());
 		_buffers.push_back(new Framebuffer());
 		_buffers[index]->AddColorTarget(GL_RGBA8);

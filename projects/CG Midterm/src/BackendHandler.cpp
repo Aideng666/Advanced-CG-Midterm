@@ -58,7 +58,7 @@ void BackendHandler::GlfwWindowResizedCallback(GLFWwindow* window, int width, in
 		{
 			buf.Reshape(width, height);
 		});
-	/*Application::Instance().ActiveScene->Registry().view<GreyscaleEffect>().each([=](GreyscaleEffect& buf)
+	Application::Instance().ActiveScene->Registry().view<GreyscaleEffect>().each([=](GreyscaleEffect& buf)
 		{
 			buf.Reshape(width, height);
 		});
@@ -69,7 +69,11 @@ void BackendHandler::GlfwWindowResizedCallback(GLFWwindow* window, int width, in
 	Application::Instance().ActiveScene->Registry().view<ColorCorrectEffect>().each([=](ColorCorrectEffect& buf)
 		{
 			buf.Reshape(width, height);
-		});*/
+		});
+	Application::Instance().ActiveScene->Registry().view<BloomEffect>().each([=](BloomEffect& buf)
+		{
+			buf.Reshape(width, height);
+		});
 }
 
 bool BackendHandler::InitGLFW()

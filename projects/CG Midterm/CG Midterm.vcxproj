@@ -110,6 +110,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="src\BackendHandler.h" />
+    <ClInclude Include="src\BloomEffect.h" />
     <ClInclude Include="src\ColorCorrectEffect.h" />
     <ClInclude Include="src\Framebuffer.h" />
     <ClInclude Include="src\GreyscaleEffect.h" />
@@ -120,6 +121,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\BackendHandler.cpp" />
+    <ClCompile Include="src\BloomEffect.cpp" />
     <ClCompile Include="src\ColorCorrectEffect.cpp" />
     <ClCompile Include="src\Framebuffer.cpp" />
     <ClCompile Include="src\GreyscaleEffect.cpp" />

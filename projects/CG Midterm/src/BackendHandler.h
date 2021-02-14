@@ -8,6 +8,7 @@
 #include "GreyscaleEffect.h"
 #include "SepiaEffect.h"
 #include "ColorCorrectEffect.h"
+#include "BloomEffect.h"
 #include "Util.h"
 
 #include <iostream>

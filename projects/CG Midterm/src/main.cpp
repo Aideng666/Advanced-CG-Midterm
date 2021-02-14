@@ -31,7 +31,37 @@ int main() {
 	float fpsBuffer[128];
 	float minFps, maxFps, avgFps;
 	int selectedVao = 0; // select cube by default
+	int lightNum = 5;
+	bool isTextured = true;
 	std::vector<GameObject> controllables;
+
+	////For Light Lerping////
+	GLfloat lightTime = 0.0f;
+
+	float t = 0.0f;
+	float totalTime;
+
+	float speed = 4.0f;
+
+	glm::vec3 point1 = glm::vec3(-3.0f, 0.0f, 20.0f);
+	glm::vec3 point2 = glm::vec3(3.0f, 0.0f, 20.0f);
+
+	glm::vec3 checker2Point1 = glm::vec3(4.0f, 4.0f, 0.0f);
+	glm::vec3 checker2Point2 = glm::vec3(8.0f, 0.0f, 0.0f);
+
+	glm::vec3 checker3Point1 = glm::vec3(-4.0f, -4.0f, 0.0f);
+	glm::vec3 checker3Point2 = glm::vec3(0.0f, 0.0f, 0.0f);
+
+	glm::vec3 currentPos = glm::vec3(3.0f, -3.0f, 15.0f);
+	glm::vec3 checker2CurrentPos = glm::vec3(4.0f, 4.0f, 0.0f);
+	glm::vec3 checker3CurrentPos = glm::vec3(-4.0f, -4.0f, 0.0f);
+
+	bool forwards = true;
+
+	float distance = glm::distance(point2, point1);
+
+	totalTime = distance / speed;
+	////////////////////////////
 
 	BackendHandler::InitAll();
 
@@ -53,12 +83,14 @@ int main() {
 		// Load our shaders
 		Shader::sptr shader = Shader::Create();
 		shader->LoadShaderPartFromFile("shaders/vertex_shader.glsl", GL_VERTEX_SHADER);
+		//shader->LoadShaderPartFromFile("shaders/frag_shader.glsl", GL_FRAGMENT_SHADER);
 		shader->LoadShaderPartFromFile("shaders/frag_blinn_phong_textured.glsl", GL_FRAGMENT_SHADER);
 		shader->Link();
 
 		glm::vec3 lightPos = glm::vec3(0.0f, 0.0f, 5.0f);
-		glm::vec3 lightCol = glm::vec3(0.9f, 0.85f, 0.5f);
-		float     lightAmbientPow = 0.05f;
+		glm::vec3 lightDir = glm::vec3(0.0f, 0.0f, -1.0f);
+		glm::vec3 lightCol = glm::vec3(1.0f, 1.0f, 1.0f);
+		float     lightAmbientPow = 0.15f;
 		float     lightSpecularPow = 1.0f;
 		glm::vec3 ambientCol = glm::vec3(1.0f);
 		float     ambientPow = 0.1f;
@@ -68,6 +100,7 @@ int main() {
 		// These are our application / scene level uniforms that don't necessarily update
 		// every frame
 		shader->SetUniform("u_LightPos", lightPos);
+		shader->SetUniform("u_LightDir", lightDir);
 		shader->SetUniform("u_LightCol", lightCol);
 		shader->SetUniform("u_AmbientLightStrength", lightAmbientPow);
 		shader->SetUniform("u_SpecularLightStrength", lightSpecularPow);
@@ -78,13 +111,14 @@ int main() {
 		shader->SetUniform("u_LightAttenuationQuadratic", lightQuadraticFalloff);
 
 		PostEffect* basicEffect;
-
-		int activeEffect = 0;
+		
+		int activeEffect = 3;
 		std::vector<PostEffect*> effects;
 
 		SepiaEffect* sepiaEffect;
 		GreyscaleEffect* greyscaleEffect;
 		ColorCorrectEffect* colorCorrectEffect;
+		BloomEffect* bloomEffect;
 
 
 		// We'll add some ImGui controls to control our shader
@@ -130,7 +164,28 @@ int main() {
 						temp->SetLUT(LUT3D(std::string(input)));
 					}
 				}
+				if (activeEffect == 3)
+				{
+					ImGui::Text("Active Effect: Bloom Effect");
+
+					BloomEffect* temp = (BloomEffect*)effects[activeEffect];
+					float threshold = temp->GetThreshold();
+
+					if (ImGui::SliderFloat("Threshold", &threshold, 0.0f, 1.0f))
+					{
+						temp->SetThreshold(threshold);
+					}
+
+					float downscale = temp->GetDownscale();
+
+					if (ImGui::SliderFloat("Blur", &downscale, 1.0f, 5.0f))
+					{
+						temp->SetDownscale(downscale);
+					}
+				}
 			}
+			if (ImGui::Checkbox("Textures", &isTextured));
+
 			if (ImGui::CollapsingHeader("Scene Level Lighting Settings"))
 			{
 				if (ImGui::ColorPicker3("Ambient Color", glm::value_ptr(ambientCol))) {
@@ -198,6 +253,9 @@ int main() {
 		Texture2D::sptr box = Texture2D::LoadFromFile("images/box.bmp");
 		Texture2D::sptr boxSpec = Texture2D::LoadFromFile("images/box-reflections.bmp");
 		Texture2D::sptr simpleFlora = Texture2D::LoadFromFile("images/SimpleFlora.png");
+		Texture2D::sptr checkerboard = Texture2D::LoadFromFile("images/Checkerboard.png");
+		Texture2D::sptr whiteChecker = Texture2D::LoadFromFile("images/WhiteChecker.jpg");
+		Texture2D::sptr blackChecker = Texture2D::LoadFromFile("images/BlackChecker.jpg");
 		LUT3D testCube("cubes/BrightenedCorrection.cube");
 
 		// Load the cube map
@@ -260,19 +318,121 @@ int main() {
 		simpleFloraMat->Set("u_Shininess", 8.0f);
 		simpleFloraMat->Set("u_TextureMix", 0.0f);
 
+		ShaderMaterial::sptr checkerMat = ShaderMaterial::Create();
+		checkerMat->Shader = shader;
+		checkerMat->Set("s_Diffuse", checkerboard);
+		checkerMat->Set("s_Specular", noSpec);
+		checkerMat->Set("u_Shininess", 8.0f);
+		checkerMat->Set("u_TextureMix", 0.0f);
+
+		ShaderMaterial::sptr whiteMat = ShaderMaterial::Create();
+		whiteMat->Shader = shader;
+		whiteMat->Set("s_Diffuse", whiteChecker);
+		whiteMat->Set("s_Specular", noSpec);
+		whiteMat->Set("u_Shininess", 8.0f);
+		whiteMat->Set("u_TextureMix", 0.0f);
+
+		ShaderMaterial::sptr blackMat = ShaderMaterial::Create();
+		blackMat->Shader = shader;
+		blackMat->Set("s_Diffuse", blackChecker);
+		blackMat->Set("s_Specular", noSpec);
+		blackMat->Set("u_Shininess", 8.0f);
+		blackMat->Set("u_TextureMix", 0.0f);
+
+		ShaderMaterial::sptr clearMat = ShaderMaterial::Create();
+		clearMat->Shader = shader;
+		clearMat->Set("s_Diffuse", texture2);
+		clearMat->Set("u_Shininess", 8.0f);
+
+
+
+
 		GameObject obj1 = scene->CreateEntity("Ground");
 		{
 			VertexArrayObject::sptr vao = ObjLoader::LoadFromFile("models/plane.obj");
-			obj1.emplace<RendererComponent>().SetMesh(vao).SetMaterial(grassMat);
+			obj1.emplace<RendererComponent>().SetMesh(vao).SetMaterial(checkerMat);
+			obj1.get<Transform>().SetLocalScale(0.5f, 0.5f, 0.5f);
+			obj1.get<Transform>().SetLocalPosition(0.0f, 0.0f, 0.0f);
 		}
 
 		GameObject obj2 = scene->CreateEntity("monkey_quads");
 		{
 			VertexArrayObject::sptr vao = ObjLoader::LoadFromFile("models/monkey_quads.obj");
 			obj2.emplace<RendererComponent>().SetMesh(vao).SetMaterial(stoneMat);
-			obj2.get<Transform>().SetLocalPosition(0.0f, 0.0f, 2.0f);
+			obj2.get<Transform>().SetLocalPosition(100.0f, 100.0f, 2.0f);
 			obj2.get<Transform>().SetLocalRotation(0.0f, 0.0f, -90.0f);
 			BehaviourBinding::BindDisabled<SimpleMoveBehaviour>(obj2);
+		}
+
+		GameObject checker2 = scene->CreateEntity("Checker 2");
+		{
+			VertexArrayObject::sptr vao = ObjLoader::LoadFromFile("models/Checkers.obj");
+			checker2.emplace<RendererComponent>().SetMesh(vao).SetMaterial(whiteMat);
+			checker2.get<Transform>().SetLocalPosition(4.0f, 4.0f, 0.0f);
+			checker2.get<Transform>().SetLocalRotation(90.0f, 0.0f, 0.0f);
+		}
+		GameObject checker3 = scene->CreateEntity("Checker 3");
+		{
+			VertexArrayObject::sptr vao = ObjLoader::LoadFromFile("models/Checkers.obj");
+			checker3.emplace<RendererComponent>().SetMesh(vao).SetMaterial(blackMat);
+			checker3.get<Transform>().SetLocalPosition(-4.0f, -4.0f, 0.0f);
+			checker3.get<Transform>().SetLocalRotation(90.0f, 0.0f, 0.0f);
+		}
+		GameObject checker4 = scene->CreateEntity("Checker 4");
+		{
+			VertexArrayObject::sptr vao = ObjLoader::LoadFromFile("models/Checkers.obj");
+			checker4.emplace<RendererComponent>().SetMesh(vao).SetMaterial(blackMat);
+			checker4.get<Transform>().SetLocalPosition(4.0f, -4.0f, 0.0f);
+			checker4.get<Transform>().SetLocalRotation(90.0f, 0.0f, 0.0f);
+		}
+		GameObject checker5 = scene->CreateEntity("Checker 5");
+		{
+			VertexArrayObject::sptr vao = ObjLoader::LoadFromFile("models/Checkers.obj");
+			checker5.emplace<RendererComponent>().SetMesh(vao).SetMaterial(whiteMat);
+			checker5.get<Transform>().SetLocalPosition(-4.0f, 4.0f, 0.0f);
+			checker5.get<Transform>().SetLocalRotation(90.0f, 0.0f, 0.0f);
+		}
+		GameObject checker6 = scene->CreateEntity("Checker 6");
+		{
+			VertexArrayObject::sptr vao = ObjLoader::LoadFromFile("models/Checkers.obj");
+			checker6.emplace<RendererComponent>().SetMesh(vao).SetMaterial(blackMat);
+			checker6.get<Transform>().SetLocalPosition(-8.0f, -8.0f, 0.0f);
+			checker6.get<Transform>().SetLocalRotation(90.0f, 0.0f, 0.0f);
+		}
+		GameObject checker7 = scene->CreateEntity("Checker 7");
+		{
+			VertexArrayObject::sptr vao = ObjLoader::LoadFromFile("models/Checkers.obj");
+			checker7.emplace<RendererComponent>().SetMesh(vao).SetMaterial(whiteMat);
+			checker7.get<Transform>().SetLocalPosition(8.0f, 8.0f, 0.0f);
+			checker7.get<Transform>().SetLocalRotation(90.0f, 0.0f, 0.0f);
+		}
+		GameObject checker8 = scene->CreateEntity("Checker 8");
+		{
+			VertexArrayObject::sptr vao = ObjLoader::LoadFromFile("models/Checkers.obj");
+			checker8.emplace<RendererComponent>().SetMesh(vao).SetMaterial(whiteMat);
+			checker8.get<Transform>().SetLocalPosition(0.0f, 8.0f, 0.0f);
+			checker8.get<Transform>().SetLocalRotation(90.0f, 0.0f, 0.0f);
+		}
+		GameObject checker9 = scene->CreateEntity("Checker 9");
+		{
+			VertexArrayObject::sptr vao = ObjLoader::LoadFromFile("models/Checkers.obj");
+			checker9.emplace<RendererComponent>().SetMesh(vao).SetMaterial(blackMat);
+			checker9.get<Transform>().SetLocalPosition(0.0f, -8.0f, 0.0f);
+			checker9.get<Transform>().SetLocalRotation(90.0f, 0.0f, 0.0f);
+		}
+		GameObject checker10 = scene->CreateEntity("Checker 10");
+		{
+			VertexArrayObject::sptr vao = ObjLoader::LoadFromFile("models/Checkers.obj");
+			checker10.emplace<RendererComponent>().SetMesh(vao).SetMaterial(whiteMat);
+			checker10.get<Transform>().SetLocalPosition(-8.0f, 8.0f, 0.0f);
+			checker10.get<Transform>().SetLocalRotation(90.0f, 0.0f, 0.0f);
+		}
+		GameObject checker11 = scene->CreateEntity("Checker 11");
+		{
+			VertexArrayObject::sptr vao = ObjLoader::LoadFromFile("models/Checkers.obj");
+			checker11.emplace<RendererComponent>().SetMesh(vao).SetMaterial(blackMat);
+			checker11.get<Transform>().SetLocalPosition(8.0f, -8.0f, 0.0f);
+			checker11.get<Transform>().SetLocalRotation(90.0f, 0.0f, 0.0f);
 		}
 
 		std::vector<glm::vec2> allAvoidAreasFrom = { glm::vec2(-4.0f, -4.0f) };
@@ -323,12 +483,19 @@ int main() {
 		}
 		effects.push_back(greyscaleEffect);
 
-		GameObject colorCorrectEffectObject = scene->CreateEntity("Greyscale Effect");
+		GameObject colorCorrectEffectObject = scene->CreateEntity("Color Correct Effect");
 		{
 			colorCorrectEffect = &colorCorrectEffectObject.emplace<ColorCorrectEffect>();
 			colorCorrectEffect->Init(width, height);
 		}
 		effects.push_back(colorCorrectEffect);
+
+		GameObject bloomEffectObject = scene->CreateEntity("Bloom Effect");
+		{
+			bloomEffect = &bloomEffectObject.emplace<BloomEffect>();
+			bloomEffect->Init(width, height);
+		}
+		effects.push_back(bloomEffect);
 
 #pragma endregion 
 		//////////////////////////////////////////////////////////////////////////////////////////
@@ -399,6 +566,34 @@ int main() {
 		while (!glfwWindowShouldClose(BackendHandler::window)) {
 			glfwPollEvents();
 
+
+			lightTime += time.DeltaTime;
+
+			shader->SetUniform("u_Time", lightTime);
+
+			if (forwards)
+				t += time.DeltaTime / totalTime;
+			else
+				t -= time.DeltaTime / totalTime;
+
+			if (t < 0.0f)
+				t = 0.0f;
+
+			if (t > 1.0f)
+				t = 1.0f;
+
+			if (t >= 1.0f || t <= 0.0f)
+				forwards = !forwards;
+
+			currentPos = glm::mix(point1, point2, t);
+			checker2CurrentPos = glm::mix(checker2Point1, checker2Point2, t);
+			checker3CurrentPos = glm::mix(checker3Point1, checker3Point2, t);
+
+			checker2.get<Transform>().SetLocalPosition(checker2CurrentPos.x, checker2CurrentPos.y, checker2CurrentPos.z);
+			checker3.get<Transform>().SetLocalPosition(checker3CurrentPos.x, checker3CurrentPos.y, checker3CurrentPos.z);
+
+			shader->SetUniform("u_Position", currentPos);
+
 			// Update the timing
 			time.CurrentFrame = glfwGetTime();
 			time.DeltaTime = static_cast<float>(time.CurrentFrame - time.LastFrame);
@@ -410,6 +605,29 @@ int main() {
 			frameIx++;
 			if (frameIx >= 128)
 				frameIx = 0;
+
+			if (glfwGetKey(BackendHandler::window, GLFW_KEY_1) == GLFW_PRESS)
+			{
+				lightNum = 1;
+			}
+			if (glfwGetKey(BackendHandler::window, GLFW_KEY_2) == GLFW_PRESS)
+			{
+				lightNum = 2;
+			}
+			if (glfwGetKey(BackendHandler::window, GLFW_KEY_3) == GLFW_PRESS)
+			{
+				lightNum = 3;
+			}
+			if (glfwGetKey(BackendHandler::window, GLFW_KEY_4) == GLFW_PRESS)
+			{
+				lightNum = 4;
+			}
+			if (glfwGetKey(BackendHandler::window, GLFW_KEY_5) == GLFW_PRESS)
+			{
+				lightNum = 5;
+			}
+
+			shader->SetUniform("u_LightNum", lightNum);
 
 			// We'll make sure our UI isn't focused before we start handling input for our game
 			if (!ImGui::IsAnyWindowFocused()) {
@@ -431,10 +649,40 @@ int main() {
 				}
 				});
 
+			if (isTextured)
+			{
+				obj1.get<RendererComponent>().SetMaterial(checkerMat);
+				obj2.get<RendererComponent>().SetMaterial(stoneMat);
+				checker2.get<RendererComponent>().SetMaterial(whiteMat);
+				checker3.get<RendererComponent>().SetMaterial(blackMat);
+				checker4.get<RendererComponent>().SetMaterial(blackMat);
+				checker5.get<RendererComponent>().SetMaterial(whiteMat);
+				checker6.get<RendererComponent>().SetMaterial(blackMat);
+				checker7.get<RendererComponent>().SetMaterial(whiteMat);
+				checker8.get<RendererComponent>().SetMaterial(whiteMat);
+				checker9.get<RendererComponent>().SetMaterial(blackMat);
+				checker10.get<RendererComponent>().SetMaterial(whiteMat);
+				checker11.get<RendererComponent>().SetMaterial(blackMat);
+			}
+			else
+			{
+				obj1.get<RendererComponent>().SetMaterial(clearMat);
+				obj2.get<RendererComponent>().SetMaterial(clearMat);
+				checker2.get<RendererComponent>().SetMaterial(clearMat);
+				checker3.get<RendererComponent>().SetMaterial(clearMat);
+				checker4.get<RendererComponent>().SetMaterial(clearMat);
+				checker5.get<RendererComponent>().SetMaterial(clearMat);
+				checker6.get<RendererComponent>().SetMaterial(clearMat);
+				checker7.get<RendererComponent>().SetMaterial(clearMat);
+				checker8.get<RendererComponent>().SetMaterial(clearMat);
+				checker9.get<RendererComponent>().SetMaterial(clearMat);
+				checker10.get<RendererComponent>().SetMaterial(clearMat);
+				checker11.get<RendererComponent>().SetMaterial(clearMat);
+			}
+
 			// Clear the screen
 			basicEffect->Clear();
-			/*greyscaleEffect->Clear();
-			sepiaEffect->Clear();*/
+
 			for (int i = 0; i < effects.size(); i++)
 			{
 				effects[i]->Clear();
